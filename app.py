@@ -1,22 +1,25 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, redirect, session
 import requests
+import os
 
 app = Flask(__name__)
+app.secret_key = "jobnestsecret"
 
 # =========================
 # 🔑 API CONFIG
 # =========================
 API_KEY = "284e976fecmsh6344107e8f517cep1a8ec9jsnfffbd6a518dd"
+
 BASE_URL = "https://jsearch.p.rapidapi.com/search"
 
 # =========================
-# 🧠 MEMORY DB (Demo)
+# 🧠 MEMORY DB
 # =========================
 users = {}
 saved_jobs = {}
 
 # =========================
-# 🔎 FETCH JOBS (WITH PAGINATION)
+# 🔎 FETCH JOBS
 # =========================
 def fetch_jobs(query, page=1):
 
@@ -33,8 +36,15 @@ def fetch_jobs(query, page=1):
     }
 
     try:
-        res = requests.get(BASE_URL, headers=headers, params=params, timeout=10)
+        res = requests.get(
+            BASE_URL,
+            headers=headers,
+            params=params,
+            timeout=10
+        )
+
         return res.json().get("data", [])
+
     except:
         return []
 
@@ -42,6 +52,7 @@ def fetch_jobs(query, page=1):
 # 🧠 SMART QUERY
 # =========================
 def build_query(search, city, portal):
+
     q = []
 
     if search:
@@ -53,7 +64,7 @@ def build_query(search, city, portal):
         q.append("in " + city)
 
     portals = {
-        "world": "linkedin naukri indeed glassdoor monster",
+        "world": "linkedin naukri indeed glassdoor",
         "linkedin": "linkedin jobs",
         "naukri": "naukri jobs india",
         "indeed": "indeed jobs"
@@ -65,7 +76,7 @@ def build_query(search, city, portal):
     return " ".join(q)
 
 # =========================
-# 🏠 HOME (LINKEDIN STYLE UI + PAGINATION)
+# 🏠 HOME PAGE
 # =========================
 @app.route("/")
 def home():
@@ -76,14 +87,20 @@ def home():
     page = int(request.args.get("page", 1))
 
     query = build_query(search, city, portal)
+
     jobs = fetch_jobs(query, page)
 
     html = f"""
+    <!DOCTYPE html>
+
     <html>
+
     <head>
-        <title>JobNest - LinkedIn Style</title>
+
+        <title>JobNest</title>
 
         <style>
+
             body {{
                 font-family: Arial;
                 background: #f3f2ef;
@@ -95,7 +112,20 @@ def home():
                 background: #0a66c2;
                 color: white;
                 padding: 15px;
-                font-size: 22px;
+                font-size: 24px;
+                font-weight: bold;
+            }}
+
+            .navbar {{
+                background: white;
+                padding: 10px;
+                box-shadow: 0px 1px 5px #ccc;
+            }}
+
+            .navbar a {{
+                margin-right: 15px;
+                text-decoration: none;
+                color: #0a66c2;
                 font-weight: bold;
             }}
 
@@ -108,115 +138,355 @@ def home():
             .card {{
                 background: white;
                 padding: 15px;
-                margin: 10px 0;
-                border-radius: 10px;
-                box-shadow: 0px 1px 3px #ccc;
-            }}
-
-            .searchbox {{
                 margin: 15px 0;
+                border-radius: 10px;
+                box-shadow: 0px 1px 5px #ccc;
             }}
 
             input, select {{
-                padding: 8px;
+                padding: 10px;
                 margin: 5px;
             }}
 
             .btn {{
                 background: #0a66c2;
                 color: white;
-                padding: 8px 12px;
                 border: none;
+                padding: 10px 15px;
                 cursor: pointer;
+                border-radius: 5px;
+            }}
+
+            .btn:hover {{
+                opacity: 0.9;
             }}
 
             .pagination {{
                 text-align: center;
-                margin: 20px;
+                margin-top: 20px;
             }}
 
             .pagination a {{
-                padding: 8px 12px;
-                margin: 5px;
                 background: #0a66c2;
                 color: white;
+                padding: 8px 15px;
                 text-decoration: none;
+                margin: 5px;
                 border-radius: 5px;
             }}
+
         </style>
+
     </head>
 
     <body>
 
-    <div class="header">🌍 JobNest Job Portal)</div>
+        <div class="header">
+            🚀 JobNest Job Portal
+        </div>
 
-    <div class="container">
+        <div class="navbar">
 
-        <form method="GET" class="searchbox">
+            <a href="/">Home</a>
 
-            <input name="search" placeholder="Search Jobs" value="{search}">
-            <input name="city" placeholder="City" value="{city}">
+            <a href="/register">Register</a>
 
-            <select name="portal">
-                <option value="">All Portals</option>
-                <option value="world">World</option>
-                <option value="linkedin">LinkedIn</option>
-                <option value="naukri">Naukri</option>
-                <option value="indeed">Indeed</option>
-            </select>
+            <a href="/login">Login</a>
 
-            <button class="btn" type="submit">Search</button>
+            <a href="/saved">Saved Jobs</a>
 
-        </form>
+            <a href="/upload">Upload Resume</a>
 
-        <h3>Page: {page}</h3>
+        </div>
+
+        <div class="container">
+
+            <form method="GET">
+
+                <input
+                    type="text"
+                    name="search"
+                    placeholder="Search Jobs"
+                    value="{search}"
+                >
+
+                <input
+                    type="text"
+                    name="city"
+                    placeholder="City"
+                    value="{city}"
+                >
+
+                <select name="portal">
+
+                    <option value="">All Portals</option>
+
+                    <option value="world">World</option>
+
+                    <option value="linkedin">LinkedIn</option>
+
+                    <option value="naukri">Naukri</option>
+
+                    <option value="indeed">Indeed</option>
+
+                </select>
+
+                <button class="btn" type="submit">
+                    Search
+                </button>
+
+            </form>
+
+            <h3>Page: {page}</h3>
     """
 
     if not jobs:
-        html += "<h3>No Jobs Found</h3>"
 
-    for job in jobs:
+        html += """
+        <h2>No Jobs Found</h2>
+        """
+
+    for idx, job in enumerate(jobs):
+
         html += f"""
-        <div class="card">
-            <h3>{job.get('job_title')}</h3>
-            <p><b>{job.get('employer_name')}</b></p>
-            <p>{job.get('job_city')}</p>
 
-            <a href="{job.get('job_apply_link')}" target="_blank">
-                Apply Now
+        <div class="card">
+
+            <h2>{job.get('job_title')}</h2>
+
+            <p>
+                <b>Company:</b>
+                {job.get('employer_name')}
+            </p>
+
+            <p>
+                <b>Location:</b>
+                {job.get('job_city')}
+            </p>
+
+            <br>
+
+            <a
+                href="{job.get('job_apply_link')}"
+                target="_blank"
+            >
+                <button class="btn">
+                    Apply Now
+                </button>
             </a>
+
+            <a href="/save/{idx}">
+                <button class="btn">
+                    Save Job
+                </button>
+            </a>
+
         </div>
         """
 
-    # =========================
-    # 🔥 PAGINATION (BOTTOM)
-    # =========================
-    next_page = page + 1
     prev_page = page - 1
+    next_page = page + 1
 
     html += f"""
-    <div class="pagination">
-        {"<a href='?page=" + str(prev_page) + "'>⬅ Prev</a>" if page > 1 else ""}
-        <a href='?page={next_page}'>Next ➡</a>
-    </div>
 
-    </div>
+        <div class="pagination">
+
+            {"<a href='?page=" + str(prev_page) + "'>⬅ Prev</a>" if page > 1 else ""}
+
+            <a href='?page={next_page}'>
+                Next ➡
+            </a>
+
+        </div>
+
+        </div>
+
     </body>
+
     </html>
     """
 
     return html
 
+# =========================
+# 🔐 REGISTER
+# =========================
+@app.route("/register", methods=["GET", "POST"])
+def register():
+
+    if request.method == "POST":
+
+        username = request.form["username"]
+        password = request.form["password"]
+
+        users[username] = password
+
+        return redirect("/login")
+
+    return """
+
+    <h2>Register</h2>
+
+    <form method="POST">
+
+        <input
+            type="text"
+            name="username"
+            placeholder="Username"
+        >
+
+        <br><br>
+
+        <input
+            type="password"
+            name="password"
+            placeholder="Password"
+        >
+
+        <br><br>
+
+        <button type="submit">
+            Register
+        </button>
+
+    </form>
+    """
 
 # =========================
-# 🚀 RUN
+# 🔑 LOGIN
+# =========================
+@app.route("/login", methods=["GET", "POST"])
+def login():
+
+    if request.method == "POST":
+
+        username = request.form["username"]
+        password = request.form["password"]
+
+        if username in users and users[username] == password:
+
+            session["user"] = username
+
+            return redirect("/")
+
+        return "Invalid Login"
+
+    return """
+
+    <h2>Login</h2>
+
+    <form method="POST">
+
+        <input
+            type="text"
+            name="username"
+            placeholder="Username"
+        >
+
+        <br><br>
+
+        <input
+            type="password"
+            name="password"
+            placeholder="Password"
+        >
+
+        <br><br>
+
+        <button type="submit">
+            Login
+        </button>
+
+    </form>
+    """
+
+# =========================
+# ❤️ SAVE JOB
+# =========================
+@app.route("/save/<jobid>")
+def save_job(jobid):
+
+    if "user" not in session:
+        return redirect("/login")
+
+    username = session["user"]
+
+    if username not in saved_jobs:
+        saved_jobs[username] = []
+
+    saved_jobs[username].append(jobid)
+
+    return redirect("/saved")
+
+# =========================
+# 📌 SAVED JOBS
+# =========================
+@app.route("/saved")
+def saved():
+
+    if "user" not in session:
+        return redirect("/login")
+
+    username = session["user"]
+
+    jobs = saved_jobs.get(username, [])
+
+    html = f"""
+    <h1>Saved Jobs</h1>
+
+    <h3>User: {username}</h3>
+
+    <ul>
+    """
+
+    for job in jobs:
+        html += f"<li>Saved Job ID: {job}</li>"
+
+    html += "</ul>"
+
+    return html
+
+# =========================
+# 📄 UPLOAD RESUME
+# =========================
+@app.route("/upload", methods=["GET", "POST"])
+def upload():
+
+    if request.method == "POST":
+
+        file = request.files["resume"]
+
+        os.makedirs("uploads", exist_ok=True)
+
+        file.save("uploads/" + file.filename)
+
+        return "Resume Uploaded Successfully"
+
+    return """
+
+    <h2>Upload Resume</h2>
+
+    <form method="POST" enctype="multipart/form-data">
+
+        <input
+            type="file"
+            name="resume"
+        >
+
+        <br><br>
+
+        <button type="submit">
+            Upload
+        </button>
+
+    </form>
+    """
+
+# =========================
+# 🚀 RUN APP
 # =========================
 if __name__ == "__main__":
-    app.run(debug=True)
 
-
-import os
-
-if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+
     app.run(host="0.0.0.0", port=port)
