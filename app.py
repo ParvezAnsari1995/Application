@@ -6,7 +6,7 @@ app = Flask(__name__)
 app.secret_key = "jobnestsecret"
 
 # ================= API =================
-API_KEY = "YOUR_RAPIDAPI_KEY"
+API_KEY = "284e976fecmsh6344107e8f517cep1a8ec9jsnfffbd6a518dd"
 BASE_URL = "https://jsearch.p.rapidapi.com/search"
 
 # ================= MEMORY DB =================
