@@ -5,24 +5,16 @@ import os
 app = Flask(__name__)
 app.secret_key = "jobnestsecret"
 
-# =========================
-# 🔑 API CONFIG
-# =========================
-API_KEY = "284e976fecmsh6344107e8f517cep1a8ec9jsnfffbd6a518dd"
-
+# ================= API =================
+API_KEY = "YOUR_RAPIDAPI_KEY"
 BASE_URL = "https://jsearch.p.rapidapi.com/search"
 
-# =========================
-# 🧠 MEMORY DB
-# =========================
+# ================= MEMORY DB =================
 users = {}
 saved_jobs = {}
 
-# =========================
-# 🔎 FETCH JOBS
-# =========================
-def fetch_jobs(query, page=1):
-
+# ================= JOB FETCH =================
+def fetch_jobs(query):
     headers = {
         "X-RapidAPI-Key": API_KEY,
         "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
@@ -30,463 +22,160 @@ def fetch_jobs(query, page=1):
 
     params = {
         "query": query,
-        "page": str(page),
-        "num_pages": "1",
-        "date_posted": "month"
+        "page": "1",
+        "num_pages": "1"
     }
 
     try:
-        res = requests.get(
-            BASE_URL,
-            headers=headers,
-            params=params,
-            timeout=10
-        )
-
+        res = requests.get(BASE_URL, headers=headers, params=params, timeout=10)
         return res.json().get("data", [])
-
     except:
         return []
 
-# =========================
-# 🧠 SMART QUERY
-# =========================
+# ================= QUERY BUILDER =================
 def build_query(search, city, portal):
-
-    q = []
-
-    if search:
-        q.append(search + " jobs")
-    else:
-        q.append("jobs hiring")
+    query = search if search else "jobs hiring"
 
     if city:
-        q.append("in " + city)
+        query += f" in {city}"
 
-    portals = {
-        "world": "linkedin naukri indeed glassdoor",
-        "linkedin": "linkedin jobs",
-        "naukri": "naukri jobs india",
-        "indeed": "indeed jobs"
-    }
+    if portal == "linkedin":
+        query += " linkedin"
+    elif portal == "naukri":
+        query += " naukri india"
+    elif portal == "indeed":
+        query += " indeed"
 
-    if portal in portals:
-        q.append(portals[portal])
+    return query
 
-    return " ".join(q)
-
-# =========================
-# 🏠 HOME PAGE
-# =========================
+# ================= HOME =================
 @app.route("/")
 def home():
-
     search = request.args.get("search", "")
     city = request.args.get("city", "")
     portal = request.args.get("portal", "")
-    page = int(request.args.get("page", 1))
 
     query = build_query(search, city, portal)
+    jobs = fetch_jobs(query)
 
-    jobs = fetch_jobs(query, page)
+    html = """
+    <h1>🚀 JobNest Portal</h1>
 
-    html = f"""
-    <!DOCTYPE html>
+    <form>
+        <input name="search" placeholder="Job title">
+        <input name="city" placeholder="City">
 
-    <html>
+        <select name="portal">
+            <option value="">All</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="naukri">Naukri</option>
+            <option value="indeed">Indeed</option>
+        </select>
 
-    <head>
+        <button type="submit">Search</button>
+    </form>
 
-        <title>JobNest</title>
-
-        <style>
-
-            body {{
-                font-family: Arial;
-                background: #f3f2ef;
-                margin: 0;
-                padding: 0;
-            }}
-
-            .header {{
-                background: #0a66c2;
-                color: white;
-                padding: 15px;
-                font-size: 24px;
-                font-weight: bold;
-            }}
-
-            .navbar {{
-                background: white;
-                padding: 10px;
-                box-shadow: 0px 1px 5px #ccc;
-            }}
-
-            .navbar a {{
-                margin-right: 15px;
-                text-decoration: none;
-                color: #0a66c2;
-                font-weight: bold;
-            }}
-
-            .container {{
-                width: 60%;
-                margin: auto;
-                padding: 20px;
-            }}
-
-            .card {{
-                background: white;
-                padding: 15px;
-                margin: 15px 0;
-                border-radius: 10px;
-                box-shadow: 0px 1px 5px #ccc;
-            }}
-
-            input, select {{
-                padding: 10px;
-                margin: 5px;
-            }}
-
-            .btn {{
-                background: #0a66c2;
-                color: white;
-                border: none;
-                padding: 10px 15px;
-                cursor: pointer;
-                border-radius: 5px;
-            }}
-
-            .btn:hover {{
-                opacity: 0.9;
-            }}
-
-            .pagination {{
-                text-align: center;
-                margin-top: 20px;
-            }}
-
-            .pagination a {{
-                background: #0a66c2;
-                color: white;
-                padding: 8px 15px;
-                text-decoration: none;
-                margin: 5px;
-                border-radius: 5px;
-            }}
-
-        </style>
-
-    </head>
-
-    <body>
-
-        <div class="header">
-            🚀 JobNest Job Portal
-        </div>
-
-        <div class="navbar">
-
-            <a href="/">Home</a>
-
-            <a href="/register">Register</a>
-
-            <a href="/login">Login</a>
-
-            <a href="/saved">Saved Jobs</a>
-
-            <a href="/upload">Upload Resume</a>
-
-        </div>
-
-        <div class="container">
-
-            <form method="GET">
-
-                <input
-                    type="text"
-                    name="search"
-                    placeholder="Search Jobs"
-                    value="{search}"
-                >
-
-                <input
-                    type="text"
-                    name="city"
-                    placeholder="City"
-                    value="{city}"
-                >
-
-                <select name="portal">
-
-                    <option value="">All Portals</option>
-
-                    <option value="world">World</option>
-
-                    <option value="linkedin">LinkedIn</option>
-
-                    <option value="naukri">Naukri</option>
-
-                    <option value="indeed">Indeed</option>
-
-                </select>
-
-                <button class="btn" type="submit">
-                    Search
-                </button>
-
-            </form>
-
-            <h3>Page: {page}</h3>
+    <hr>
     """
 
-    if not jobs:
-
-        html += """
-        <h2>No Jobs Found</h2>
-        """
-
-    for idx, job in enumerate(jobs):
-
+    for i, job in enumerate(jobs):
         html += f"""
-
-        <div class="card">
-
-            <h2>{job.get('job_title')}</h2>
-
-            <p>
-                <b>Company:</b>
-                {job.get('employer_name')}
-            </p>
-
-            <p>
-                <b>Location:</b>
-                {job.get('job_city')}
-            </p>
-
-            <br>
-
-            <a
-                href="{job.get('job_apply_link')}"
-                target="_blank"
-            >
-                <button class="btn">
-                    Apply Now
-                </button>
-            </a>
-
-            <a href="/save/{idx}">
-                <button class="btn">
-                    Save Job
-                </button>
-            </a>
-
+        <div style="border:1px solid #ccc; padding:10px; margin:10px;">
+            <h3>{job.get('job_title')}</h3>
+            <p>{job.get('employer_name')}</p>
+            <a href="{job.get('job_apply_link')}" target="_blank">Apply</a>
+            <a href="/save/{i}">Save</a>
         </div>
         """
-
-    prev_page = page - 1
-    next_page = page + 1
-
-    html += f"""
-
-        <div class="pagination">
-
-            {"<a href='?page=" + str(prev_page) + "'>⬅ Prev</a>" if page > 1 else ""}
-
-            <a href='?page={next_page}'>
-                Next ➡
-            </a>
-
-        </div>
-
-        </div>
-
-    </body>
-
-    </html>
-    """
 
     return html
 
-# =========================
-# 🔐 REGISTER
-# =========================
+# ================= REGISTER =================
 @app.route("/register", methods=["GET", "POST"])
 def register():
-
     if request.method == "POST":
-
-        username = request.form["username"]
-        password = request.form["password"]
-
-        users[username] = password
-
+        users[request.form["username"]] = request.form["password"]
         return redirect("/login")
 
     return """
-
     <h2>Register</h2>
-
     <form method="POST">
-
-        <input
-            type="text"
-            name="username"
-            placeholder="Username"
-        >
-
-        <br><br>
-
-        <input
-            type="password"
-            name="password"
-            placeholder="Password"
-        >
-
-        <br><br>
-
-        <button type="submit">
-            Register
-        </button>
-
+        <input name="username">
+        <input name="password" type="password">
+        <button>Register</button>
     </form>
     """
 
-# =========================
-# 🔑 LOGIN
-# =========================
+# ================= LOGIN =================
 @app.route("/login", methods=["GET", "POST"])
 def login():
-
     if request.method == "POST":
+        u = request.form["username"]
+        p = request.form["password"]
 
-        username = request.form["username"]
-        password = request.form["password"]
-
-        if username in users and users[username] == password:
-
-            session["user"] = username
-
+        if u in users and users[u] == p:
+            session["user"] = u
             return redirect("/")
-
-        return "Invalid Login"
+        return "Invalid login"
 
     return """
-
     <h2>Login</h2>
-
     <form method="POST">
-
-        <input
-            type="text"
-            name="username"
-            placeholder="Username"
-        >
-
-        <br><br>
-
-        <input
-            type="password"
-            name="password"
-            placeholder="Password"
-        >
-
-        <br><br>
-
-        <button type="submit">
-            Login
-        </button>
-
+        <input name="username">
+        <input name="password" type="password">
+        <button>Login</button>
     </form>
     """
 
-# =========================
-# ❤️ SAVE JOB
-# =========================
+# ================= SAVE JOB =================
 @app.route("/save/<jobid>")
-def save_job(jobid):
-
+def save(jobid):
     if "user" not in session:
         return redirect("/login")
 
-    username = session["user"]
+    user = session["user"]
 
-    if username not in saved_jobs:
-        saved_jobs[username] = []
+    if user not in saved_jobs:
+        saved_jobs[user] = []
 
-    saved_jobs[username].append(jobid)
+    saved_jobs[user].append(jobid)
 
     return redirect("/saved")
 
-# =========================
-# 📌 SAVED JOBS
-# =========================
+# ================= SAVED JOBS =================
 @app.route("/saved")
 def saved():
-
     if "user" not in session:
         return redirect("/login")
 
-    username = session["user"]
+    user = session["user"]
+    jobs = saved_jobs.get(user, [])
 
-    jobs = saved_jobs.get(username, [])
+    html = f"<h1>Saved Jobs - {user}</h1>"
 
-    html = f"""
-    <h1>Saved Jobs</h1>
-
-    <h3>User: {username}</h3>
-
-    <ul>
-    """
-
-    for job in jobs:
-        html += f"<li>Saved Job ID: {job}</li>"
-
-    html += "</ul>"
+    for j in jobs:
+        html += f"<p>Saved Job ID: {j}</p>"
 
     return html
 
-# =========================
-# 📄 UPLOAD RESUME
-# =========================
+# ================= UPLOAD RESUME =================
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
-
     if request.method == "POST":
-
         file = request.files["resume"]
-
         os.makedirs("uploads", exist_ok=True)
-
         file.save("uploads/" + file.filename)
-
-        return "Resume Uploaded Successfully"
+        return "Uploaded successfully"
 
     return """
-
     <h2>Upload Resume</h2>
-
     <form method="POST" enctype="multipart/form-data">
-
-        <input
-            type="file"
-            name="resume"
-        >
-
-        <br><br>
-
-        <button type="submit">
-            Upload
-        </button>
-
+        <input type="file" name="resume">
+        <button>Upload</button>
     </form>
     """
 
-# =========================
-# 🚀 RUN APP
-# =========================
+# ================= RUN =================
 if __name__ == "__main__":
-
     port = int(os.environ.get("PORT", 5000))
-
     app.run(host="0.0.0.0", port=port)
